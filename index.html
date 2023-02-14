@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>地址標記</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <link
+      rel="stylesheet"
+      href="defStyle.css" />
+    <style>
+      #map {
+        height: 1080px;
+      }
+      .marker-animation {
+        animation: marker-bounce 0.5s linear infinite;
+      }
+      @keyframes marker-bounce {
+        0% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-10px);
+        }
+        100% {
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <input
+      type="file"
+      id="fileInput"
+      accept=".xlsx" />
+    <button id="convertBtn">轉換</button>
+    <pre
+      id="jsonOutput"
+      hidden></pre>
+    <div id="map"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.24.0/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.3/xlsx.full.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAveZEr-YOWQF9lziuVwSYtm2WweW2od1w&callback=Function.prototype"></script>
+    <script>
+      // 初始化地圖
+      var map = L.map("map").setView([22.683225, 120.481481], 13);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution:
+          'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+        maxZoom: 18,
+      }).addTo(map);
+
+      // 標記地址
+      var addressList = new Array();
+
+      //icon
+      var icon = L.icon({
+        iconUrl: "https://cdn-icons-png.flaticon.com/512/9700/9700640.png",
+        iconSize: [16, 16],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32],
+      });
+
+      function convertAddressToLatLng(addressName) {
+        return new Promise(function (resolve, reject) {
+          var address = addressName;
+          var geocoder = new google.maps.Geocoder();
+          geocoder.geocode({ address: address }, function (results, status) {
+            if (status === "OK") {
+              var lat = results[0].geometry.location.lat();
+              var lng = results[0].geometry.location.lng();
+
+              resolve({ lat: lat, lng: lng });
+            } else {
+              console.error("Geocode was not successful for the following reason: " + status);
+              reject(Error("Geocode was not successful for the following reason: " + status));
+            }
+          });
+        });
+      }
+
+      function createMarkers() {
+        for (var i = 0; i < addressList.length; i++) {
+          var address = addressList[i];
+
+          var marker = L.marker([address.lat, address.lng], { icon: icon }).addTo(map);
+          marker.bindPopup(address.name).openPopup();
+        }
+      }
+
+      document.getElementById("convertBtn").addEventListener("click", function () {
+        var files = document.getElementById("fileInput").files;
+        if (files.length == 0) return;
+        var file = files[0];
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          var data = new Uint8Array(e.target.result);
+          var workbook = XLSX.read(data, { type: "array", raw: true, encoding: "utf-8" });
+          var sheetName = workbook.SheetNames[0];
+          var sheet = workbook.Sheets[sheetName];
+          var json = XLSX.utils.sheet_to_json(sheet);
+          addressList = json;
+
+          document.getElementById("jsonOutput").textContent = JSON.stringify(json);
+          createMarkers();
+        };
+        reader.readAsArrayBuffer(file);
+      });
+
+      // setInterval(function () {
+      //   var markers = document.getElementsByClassName("leaflet-marker-icon");
+      //   for (var i = 0; i < markers.length; i++) {
+      //     markers[i].classList.toggle("marker-animation");
+      //   }
+      // }, 500);
+    </script>
+  </body>
+</html>
